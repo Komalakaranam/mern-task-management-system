@@ -10,6 +10,9 @@ function Login() {
     password: ""
   });
 
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -19,13 +22,14 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
 
     try {
       const res = await API.post("/auth/login", formData);
       localStorage.setItem("token", res.data.token);
       navigate("/dashboard");
-    } catch {
-      alert("Login failed");
+    } catch (err) {
+      setError("Invalid email or password");
     }
   };
 
@@ -46,14 +50,29 @@ function Login() {
             required
           />
 
-          <input
-            className="w-full p-3 rounded-lg bg-darkBg border border-gray-700 text-white"
-            type="password"
-            name="password"
-            placeholder="Password"
-            onChange={handleChange}
-            required
-          />
+          {/* Password with toggle */}
+          <div className="relative">
+            <input
+              className="w-full p-3 rounded-lg bg-darkBg border border-gray-700 text-white pr-10"
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Password"
+              onChange={handleChange}
+              required
+            />
+
+            <span
+              className="absolute right-3 top-3 cursor-pointer text-gray-400"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "🙈" : "👁"}
+            </span>
+          </div>
+
+          {/* Error message */}
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
 
           <button className="w-full bg-purplePrimary hover:bg-violetSoft p-3 rounded-lg font-semibold">
             Login

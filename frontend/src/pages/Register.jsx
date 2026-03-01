@@ -11,6 +11,9 @@ function Register() {
     password: ""
   });
 
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -18,13 +21,29 @@ function Register() {
     });
   };
 
+  // Password validation
+  const validatePassword = (password) => {
+    const regex =
+      /^(?=.*[A-Z])(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+    return regex.test(password);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+
+    if (!validatePassword(formData.password)) {
+      setError(
+        "Password must be at least 8 characters, include 1 uppercase letter and 1 special character."
+      );
+      return;
+    }
+
     try {
       await API.post("/auth/register", formData);
       navigate("/");
-    } catch {
-      alert("Registration failed");
+    } catch (err) {
+      setError("Registration failed. Try again.");
     }
   };
 
@@ -54,14 +73,29 @@ function Register() {
             required
           />
 
-          <input
-            className="w-full p-3 rounded-lg bg-darkBg border border-gray-700 text-white"
-            type="password"
-            name="password"
-            placeholder="Password"
-            onChange={handleChange}
-            required
-          />
+          {/* Password Field with Toggle */}
+          <div className="relative">
+            <input
+              className="w-full p-3 rounded-lg bg-darkBg border border-gray-700 text-white pr-10"
+              type={showPassword ? "text" : "password"}
+              name="password"
+              placeholder="Password"
+              onChange={handleChange}
+              required
+            />
+
+            <span
+              className="absolute right-3 top-3 cursor-pointer text-gray-400"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? "🙈" : "👁"}
+            </span>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
 
           <button className="w-full bg-purplePrimary hover:bg-violetSoft p-3 rounded-lg font-semibold">
             Register

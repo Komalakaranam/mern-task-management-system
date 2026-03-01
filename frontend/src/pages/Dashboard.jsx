@@ -17,7 +17,6 @@ function Dashboard() {
   const [showModal, setShowModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [now, setNow] = useState(new Date());
-const [selectedDate, setSelectedDate] = useState(new Date());
 
   const [formData, setFormData] = useState({
     title: "",
@@ -26,12 +25,11 @@ const [selectedDate, setSelectedDate] = useState(new Date());
     dueDate: "",
   });
 
-  // ================= AUTO REFRESH EVERY MINUTE =================
+  // ================= AUTO REFRESH =================
   useEffect(() => {
     const interval = setInterval(() => {
       setNow(new Date());
     }, 60000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -50,20 +48,6 @@ const [selectedDate, setSelectedDate] = useState(new Date());
     fetchTasks();
   }, []);
 
-  // ================= REMINDER POPUP =================
-  useEffect(() => {
-    tasks.forEach((task) => {
-      if (!task.dueDate) return;
-
-      const diff = new Date(task.dueDate) - now;
-
-      // 10 minute reminder
-      if (diff > 0 && diff <= 10 * 60 * 1000) {
-        alert(`Reminder: "${task.title}" is due in less than 10 minutes!`);
-      }
-    });
-  }, [now]);
-
   // ================= TIME REMAINING =================
   const getTimeRemaining = (dueDate) => {
     const diff = new Date(dueDate) - now;
@@ -81,21 +65,42 @@ const [selectedDate, setSelectedDate] = useState(new Date());
     new Date(task.dueDate) < now &&
     task.status !== "Completed";
 
-  // ================= CREATE =================
+  // ================= FORM =================
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleCreate = async (e) => {
+  const handleEdit = (task) => {
+    setEditingTask(task);
+    setFormData({
+      title: task.title,
+      description: task.description,
+      priority: task.priority || "Medium",
+      dueDate: task.dueDate
+        ? new Date(task.dueDate).toISOString().slice(0, 16)
+        : "",
+    });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    await API.post("/tasks", formData);
+
+    if (editingTask) {
+      await API.put(`/tasks/${editingTask._id}`, formData);
+    } else {
+      await API.post("/tasks", formData);
+    }
+
     setShowModal(false);
+    setEditingTask(null);
     setFormData({
       title: "",
       description: "",
       priority: "Medium",
       dueDate: "",
     });
+
     fetchTasks();
   };
 
@@ -104,17 +109,6 @@ const [selectedDate, setSelectedDate] = useState(new Date());
     await API.delete(`/tasks/${id}`);
     fetchTasks();
   };
-const tasksForSelectedDate = tasks.filter((task) => {
-  if (!task.dueDate) return false;
-
-  const taskDate = new Date(task.dueDate);
-
-  return (
-    taskDate.getFullYear() === selectedDate.getFullYear() &&
-    taskDate.getMonth() === selectedDate.getMonth() &&
-    taskDate.getDate() === selectedDate.getDate()
-  );
-});
 
   // ================= STATUS =================
   const cycleStatus = async (task) => {
@@ -132,9 +126,11 @@ const tasksForSelectedDate = tasks.filter((task) => {
   // ================= DRAG =================
   const onDragEnd = async (result) => {
     if (!result.destination) return;
+
     await API.put(`/tasks/${result.draggableId}`, {
       status: result.destination.droppableId,
     });
+
     fetchTasks();
   };
 
@@ -142,7 +138,6 @@ const tasksForSelectedDate = tasks.filter((task) => {
 
   return (
     <div className="flex min-h-screen text-white bg-darkBg">
-
       {/* SIDEBAR */}
       <div className="w-64 bg-sidebarBg p-6 flex flex-col justify-between">
         <div>
@@ -180,7 +175,6 @@ const tasksForSelectedDate = tasks.filter((task) => {
 
       {/* MAIN */}
       <div className="flex-1 p-10">
-
         <div className="flex justify-between mb-8">
           <h1 className="text-3xl font-bold text-lavender">
             {activeView}
@@ -194,11 +188,10 @@ const tasksForSelectedDate = tasks.filter((task) => {
           </button>
         </div>
 
-        {/* ================= BOARD VIEW ================= */}
+        {/* ================= BOARD ================= */}
         {activeView === "Board" && (
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="grid md:grid-cols-3 gap-6">
-
               {statuses.map((status) => (
                 <Droppable droppableId={status} key={status}>
                   {(provided) => (
@@ -231,7 +224,7 @@ const tasksForSelectedDate = tasks.filter((task) => {
                                   {...provided.dragHandleProps}
                                   className={`p-4 mb-4 rounded-lg border ${
                                     isOverdue(task)
-                                      ? "border-red-500 bg-red-500/10 animate-pulse"
+                                      ? "border-red-500 bg-red-500/10"
                                       : "border-gray-700 bg-darkBg"
                                   }`}
                                 >
@@ -266,6 +259,15 @@ const tasksForSelectedDate = tasks.filter((task) => {
                                   <div className="flex justify-between mt-3">
                                     <button
                                       onClick={() =>
+                                        handleEdit(task)
+                                      }
+                                      className="text-xs bg-blue-600 px-2 py-1 rounded"
+                                    >
+                                      Edit
+                                    </button>
+
+                                    <button
+                                      onClick={() =>
                                         cycleStatus(task)
                                       }
                                       className="text-xs bg-purplePrimary px-2 py-1 rounded"
@@ -293,12 +295,11 @@ const tasksForSelectedDate = tasks.filter((task) => {
                   )}
                 </Droppable>
               ))}
-
             </div>
           </DragDropContext>
         )}
 
-        {/* ================= CALENDAR VIEW ================= */}
+        {/* ================= CALENDAR ================= */}
         {activeView === "Calendar" && (
           <div className="bg-cardBg p-6 rounded-xl">
             <Calendar />
@@ -320,13 +321,15 @@ const tasksForSelectedDate = tasks.filter((task) => {
           </div>
         )}
 
-        {/* CREATE MODAL */}
+        {/* ================= MODAL ================= */}
         {showModal && (
           <div className="fixed inset-0 bg-black/60 flex justify-center items-center">
             <div className="bg-cardBg p-8 rounded-xl w-96">
-              <h2 className="mb-4 text-lavender">Add Task</h2>
+              <h2 className="mb-4 text-lavender">
+                {editingTask ? "Edit Task" : "Add Task"}
+              </h2>
 
-              <form onSubmit={handleCreate} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <input
                   type="text"
                   name="title"
@@ -356,7 +359,10 @@ const tasksForSelectedDate = tasks.filter((task) => {
                 <div className="flex justify-between">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingTask(null);
+                    }}
                     className="bg-gray-600 px-4 py-2 rounded"
                   >
                     Cancel
@@ -366,14 +372,13 @@ const tasksForSelectedDate = tasks.filter((task) => {
                     type="submit"
                     className="bg-purplePrimary px-4 py-2 rounded"
                   >
-                    Save
+                    {editingTask ? "Update" : "Save"}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
